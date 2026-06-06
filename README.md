@@ -1,7 +1,7 @@
 # Hermes Web UI & Android Client
 
 > [!WARNING]
-> This repository is a personal fork of the original [nesquena/hermes-webui](https://github.com/nesquena/hermes-webui) project, customized solely for personal use. The Android client code, packaging, automated CI/CD workflows, and release pipeline configurations in this repository were designed and implemented using AI (Antigravity). As a personal project, it is provided "as-is" and will probably lack in general quality, testing across diverse devices, and ongoing maintenance.
+> This repository is a personal fork of the original [nesquena/hermes-webui](https://github.com/nesquena/hermes-webui) project, customized solely for my personal use. The Android client code, packaging, automated CI/CD workflows, and release pipeline configurations in this repository were designed and implemented using AI (Antigravity). As a personal project, it is provided "as-is" and will probably lack in general quality, testing across diverse devices, and ongoing maintenance.
 
 [Hermes Agent](https://hermes-agent.nousresearch.com/) is a sophisticated autonomous agent that lives on your server, accessed via a terminal or messaging apps, that remembers what it learns and gets more capable the longer it runs.
 
