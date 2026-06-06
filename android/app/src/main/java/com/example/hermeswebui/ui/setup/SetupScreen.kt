@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import com.example.hermeswebui.utils.UrlUtils
 
 // Custom Palette matching Hermes Dark gold/charcoal skin
 private val HermesBg = Color(0xFF101012)
@@ -163,7 +164,7 @@ fun SetupScreen(
                             errorMessage = null
 
                             scope.launch {
-                                val normalizedUrl = normalizeUrl(urlInput)
+                                val normalizedUrl = UrlUtils.normalizeUrl(urlInput)
                                 val reachable = testServerReachability(normalizedUrl)
                                 isLoading = false
 
@@ -245,18 +246,6 @@ fun SetupScreen(
             }
         }
     }
-}
-
-private fun normalizeUrl(input: String): String {
-    var url = input.trim()
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url = "http://$url"
-    }
-    // Remove trailing slash for consistency
-    if (url.endsWith("/")) {
-        url = url.substring(0, url.length - 1)
-    }
-    return url
 }
 
 private suspend fun testServerReachability(urlStr: String): Boolean = withContext(Dispatchers.IO) {

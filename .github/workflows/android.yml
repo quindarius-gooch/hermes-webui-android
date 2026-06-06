@@ -27,6 +27,11 @@ jobs:
       - name: Make Gradle Executable
         run: chmod +x android/gradlew
 
+      - name: Run Unit Tests
+        run: |
+          cd android
+          ./gradlew testDebugUnitTest
+
       - name: Build Debug APK
         run: |
           cd android
