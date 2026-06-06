@@ -3,6 +3,16 @@
 
 ## [Unreleased]
 
+## [v1.0.0-android] — 2026-06-06 — Initial Android WebView Client Release
+
+### Added
+- **Native Android WebView client wrapper** under `android/` built with Jetpack Compose.
+- **Reachability validation** on the setup screen to check server/Tailscale URL before launching the web UI.
+- **Premium dark gold theme** tailored to look premium on Android devices.
+- **Microphone and audio permission capture forwarding** inside WebView for seamless voice assistant support.
+- **File upload and download integrations** using `WebChromeClient.onShowFileChooser` and system `DownloadManager`.
+- **GitHub Actions workflows** (`android.yml` for pull request compilation checks, and `release.yml` to automatically build the APK and attach it to GitHub releases for every tag).
+
 ## [v0.51.293] — 2026-06-06 — Release JI (stage-s5 — thinking card no longer renders twice)
 
 ### Fixed
