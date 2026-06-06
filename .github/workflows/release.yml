@@ -12,7 +12,7 @@ jobs:
       contents: write   # required: create GitHub Release
       packages: write   # required: push to ghcr.io
 
-     steps:
+    steps:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
