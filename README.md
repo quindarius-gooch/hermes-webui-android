@@ -1,8 +1,11 @@
-# Hermes Web UI
+# Hermes Web UI & Android Client
+
+> [!NOTE]
+> This repository is a fork of the original [nesquena/hermes-webui](https://github.com/nesquena/hermes-webui) project, customized to support running Hermes WebUI natively on Android. The Android client code, packaging, automated CI/CD workflows, and release pipeline configurations in this repository were designed and implemented using AI (Antigravity).
 
 [Hermes Agent](https://hermes-agent.nousresearch.com/) is a sophisticated autonomous agent that lives on your server, accessed via a terminal or messaging apps, that remembers what it learns and gets more capable the longer it runs.
 
-Hermes WebUI is a lightweight, dark-themed web app interface in your browser for [Hermes Agent](https://hermes-agent.nousresearch.com/).
+Hermes WebUI is a lightweight, dark-themed web app interface in your browser for [Hermes Agent](https://hermes-agent.nousresearch.com/). This fork integrates a native Android Jetpack Compose client to access the WebUI seamlessly on mobile.
 Full parity with the CLI experience - everything you can do from a terminal,
 you can do from this UI. No build step, no framework, no bundler. Just Python
 and vanilla JS.
@@ -49,6 +52,7 @@ This gives you nearly **1:1 parity with Hermes CLI from a convenient web UI** wh
 
 - [Why Hermes](#why-hermes) — what it is and how it compares
 - [Quick start](#quick-start) — clone + `bootstrap.py` / `start.sh` / `ctl.sh`
+- [Android Client](#android-client) — native Jetpack Compose WebView client wrapper
 - [Features](#features) — chat, sessions, workspace, voice, profiles, security, themes, panels, mobile
 - [Configuration & access](#configuration--access) — auto-discovery, overrides, remote/Tailscale/phone, manual launch
 - [Docker](#docker) — single- and multi-container deploys
@@ -161,6 +165,34 @@ A community-maintained native Windows setup is documented at [@markwang2658/herm
 If provider setup is still incomplete after install, the onboarding wizard will point you to finish it with `hermes model` instead of trying to replicate the full CLI setup in-browser.
 For a step-by-step walkthrough of the wizard, provider choices, local model server Base URLs, and safe re-runs, see [`docs/onboarding.md`](docs/onboarding.md).
 If an AI assistant is helping with install, reinstall, bootstrap, provider setup, or first-run support, have it read [`docs/onboarding-agent-checklist.md`](docs/onboarding-agent-checklist.md) before running commands or inspecting logs.
+
+---
+
+## Android Client
+
+This repository includes a native Android client under the `android/` directory that wraps the Hermes WebUI in a premium, responsive container using Jetpack Compose and native WebView integrations.
+
+### Key Features
+- **Host Connection Validator**: Startup screen with active reachability/ping test checks host `/health` before entering the WebView, with options to set up and save custom network/Tailscale addresses.
+- **Audio Capture & Web Speech Integration**: WebView is configured to handle record-audio requests natively, enabling voice control/transcription inside the chat composer.
+- **File Chooser (`onShowFileChooser`)**: Deep integration with Compose's Activity Result Launchers to enable file uploads from your device's files/media selector directly to the Hermes Workspace.
+- **Background Downloads**: Integrates with Android's system `DownloadManager` to handle workspace downloads, saving files to the default public `Downloads` directory.
+- **Cleartext HTTP Traffic**: Enabled by default to easily support connecting to local network servers and Tailscale endpoints without certificate validation issues.
+
+### How to Install (Releases)
+- For the fastest setup, visit the repository's **Releases** tab on GitHub and download the pre-compiled `hermes-client-android-debug.apk`.
+- Install the APK on your Android device (make sure to toggle "Install from Unknown Sources" if prompted).
+
+### Local Build Guide
+If you want to modify the client or compile it locally:
+1. Ensure Java JDK 17 is installed on your system.
+2. From the `/android` directory, compile using:
+   ```bash
+   ./gradlew assembleDebug
+   ```
+3. Locate the output APK at `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+For detailed information about configuration, navigation routing, and troubleshooting the Android app, see the [walkthrough.md](file:///home/jakesavoy/.gemini/antigravity/brain/52a8b908-bd86-408f-bc8a-1ee56af38ed9/walkthrough.md) design document.
 
 ---
 
