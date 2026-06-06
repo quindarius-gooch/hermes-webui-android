@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+### Added
+- **JavaScript Console Forwarding**: Overrode `onConsoleMessage` in `webChromeClient` to forward all web logs, warnings, and errors to Android Logcat (`HermesWebViewConsole` tag) for easier remote diagnostics.
+
+### Fixed
+- **Android WebView Session Loss**: Implemented immediate cookie flushing using `CookieManager.getInstance().flush()` on page finished and app pause/ON_PAUSE lifecycle events, preventing loss of the HMAC session authentication cookie (`hermes_session`) when backgrounding or swiping away the application.
+
 ## [v1.0.0-android] — 2026-06-06 — Initial Android WebView Client Release
 
 ### Added

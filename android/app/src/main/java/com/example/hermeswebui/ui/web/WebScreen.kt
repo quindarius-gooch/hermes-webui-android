@@ -10,8 +10,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.util.Log
 import android.webkit.*
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,7 +48,22 @@ fun WebScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
+
+    // Periodically flush cookies to disk when the app goes to the background/pause
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                CookieManager.getInstance().flush()
+                Log.d("HermesWebScreen", "Flushed cookies to disk on app pause")
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     var loadingProgress by remember { mutableStateOf(0) }
     var isPageLoading by remember { mutableStateOf(true) }
 
@@ -189,10 +208,12 @@ fun WebScreen(
                                 loadingProgress = 0
                             }
 
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                isPageLoading = false
-                                loadingProgress = 100
-                            }
+                             override fun onPageFinished(view: WebView?, url: String?) {
+                                 isPageLoading = false
+                                 loadingProgress = 100
+                                 CookieManager.getInstance().flush()
+                                 Log.d("HermesWebScreen", "Flushed cookies to disk on page finished: $url")
+                             }
 
                             override fun onReceivedError(
                                 view: WebView?,
@@ -207,15 +228,34 @@ fun WebScreen(
                             }
                         }
 
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                loadingProgress = newProgress
-                                if (newProgress >= 100) {
-                                    isPageLoading = false
-                                }
-                            }
+                         webChromeClient = object : WebChromeClient() {
+                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                 loadingProgress = newProgress
+                                 if (newProgress >= 100) {
+                                     isPageLoading = false
+                                 }
+                             }
 
-                            // Intercept file chooser for uploading attachments
+                             // Forward JavaScript console messages/errors to Android Logcat
+                             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                 consoleMessage?.let {
+                                     val level = when (it.messageLevel()) {
+                                         ConsoleMessage.MessageLevel.ERROR -> Log.ERROR
+                                         ConsoleMessage.MessageLevel.WARNING -> Log.WARN
+                                         ConsoleMessage.MessageLevel.LOG -> Log.INFO
+                                         ConsoleMessage.MessageLevel.TIP -> Log.DEBUG
+                                         else -> Log.VERBOSE
+                                     }
+                                     Log.println(
+                                         level,
+                                         "HermesWebViewConsole",
+                                         "${it.message()} -- From line ${it.lineNumber()} of ${it.sourceId()}"
+                                     )
+                                 }
+                                 return super.onConsoleMessage(consoleMessage)
+                             }
+
+                             // Intercept file chooser for uploading attachments
                             override fun onShowFileChooser(
                                 webView: WebView?,
                                 filePathCallback: ValueCallback<Array<Uri>>?,
