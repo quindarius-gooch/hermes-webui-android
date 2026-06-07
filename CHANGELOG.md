@@ -3,6 +3,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Android Native Completion Notifications**: Added an Android WebView notification bridge and Android 13+ notification permission request so hidden WebView completions can surface as system notifications for agent responses, background tasks, and cron run completions.
+
 ## [v1.0.4-android] — 2026-06-07 — Viewport Resize & Connection Pool Exhaustion Fixes
 
 ### Added

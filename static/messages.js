@@ -4301,6 +4301,12 @@ function playAttentionSound(key){
 
 function sendBrowserNotification(title,body){
   if(!window._notificationsEnabled||!document.hidden) return;
+  if(window.HermesAndroidBridge&&typeof window.HermesAndroidBridge.notify==='function'){
+    try{
+      window.HermesAndroidBridge.notify(String(title||assistantDisplayName()), String(body||''));
+      return;
+    }catch(e){console.warn('Android notification bridge failed:',e);}
+  }
   if(!('Notification' in window)) return;
   const botName=assistantDisplayName();
   if(Notification.permission==='granted'){
@@ -4413,6 +4419,7 @@ function startBackgroundPolling(parentSid, taskId, prompt){
             S.messages.push(msg);
             renderMessages({preserveScroll:true});
             showToast(t('bg_complete'));
+            sendBrowserNotification(t('bg_complete'), (res.answer||t('bg_no_answer')).slice(0,120));
             return;
           }
         }

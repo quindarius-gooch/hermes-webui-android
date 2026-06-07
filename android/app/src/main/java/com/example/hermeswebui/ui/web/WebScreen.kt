@@ -3,6 +3,9 @@ package com.example.hermeswebui.ui.web
 import android.Manifest
 import android.app.Activity
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -13,6 +16,7 @@ import android.os.Environment
 import android.util.Log
 import android.webkit.*
 import android.widget.Toast
+import com.example.hermeswebui.MainActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -32,13 +36,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import kotlin.math.absoluteValue
 
 // Custom Palette matching Hermes gold/charcoal theme
 private val HermesBg = Color(0xFF101012)
 private val HermesGold = Color(0xFFE5C158)
 private val HermesTextPrimary = Color(0xFFEAEAEA)
 private val HermesBorder = Color(0xFF2C2C30)
+private const val HERMES_NOTIFICATION_CHANNEL_ID = "hermes_agent_events"
+private const val HERMES_NOTIFICATION_CHANNEL_NAME = "Hermes agent events"
 
 private const val INJECTION_SCRIPT = """
 (function() {
@@ -98,6 +106,57 @@ private const val INJECTION_SCRIPT = """
 })();
 """
 
+private class HermesNotificationBridge(private val context: Context) {
+    @JavascriptInterface
+    fun notify(title: String?, body: String?) {
+        showHermesNotification(context, title, body)
+    }
+}
+
+private fun showHermesNotification(context: Context, title: String?, body: String?) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    ) {
+        Log.w("HermesNotifications", "Notification skipped because POST_NOTIFICATIONS is not granted")
+        return
+    }
+
+    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = NotificationChannel(
+            HERMES_NOTIFICATION_CHANNEL_ID,
+            HERMES_NOTIFICATION_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Agent responses, cron completions, and background task alerts"
+        }
+        manager.createNotificationChannel(channel)
+    }
+
+    val openAppIntent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }
+    val pendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        openAppIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val safeTitle = title?.trim()?.take(80).takeUnless { it.isNullOrEmpty() } ?: "Hermes"
+    val safeBody = body?.trim()?.take(240).orEmpty()
+    val notification = NotificationCompat.Builder(context, HERMES_NOTIFICATION_CHANNEL_ID)
+        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setContentTitle(safeTitle)
+        .setContentText(safeBody)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(safeBody))
+        .setContentIntent(pendingIntent)
+        .setAutoCancel(true)
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .build()
+
+    manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt().absoluteValue, notification)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebScreen(
@@ -147,21 +206,33 @@ fun WebScreen(
         uploadMessage = null
     }
 
-    // Upfront microphone permission request
-    val micPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Toast.makeText(context, "Voice input permission granted", Toast.LENGTH_SHORT).show()
-        } else {
+    // Upfront microphone + notification permission request
+    val appPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.RECORD_AUDIO] == false) {
             Toast.makeText(context, "Voice input requires microphone access", Toast.LENGTH_LONG).show()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            permissions[Manifest.permission.POST_NOTIFICATIONS] == false
+        ) {
+            Toast.makeText(context, "Notifications are disabled for Hermes", Toast.LENGTH_LONG).show()
         }
     }
 
-    // Trigger mic permission request on startup if not already granted
+    // Trigger runtime permission requests on startup if not already granted
     LaunchedEffect(Unit) {
+        val missingPermissions = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            missingPermissions.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missingPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (missingPermissions.isNotEmpty()) {
+            appPermissionLauncher.launch(missingPermissions.toTypedArray())
         }
     }
 
@@ -273,6 +344,7 @@ fun WebScreen(
                         
                         // Clear HTTP cache on launch to ensure fresh resource loading
                         clearCache(true)
+                        addJavascriptInterface(HermesNotificationBridge(ctx.applicationContext), "HermesAndroidBridge")
 
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -364,7 +436,7 @@ fun WebScreen(
                                         request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
                                     } else {
                                         // Request permission upfront, deny this specific web request for now
-                                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        appPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                                         request.deny()
                                     }
                                 } else {

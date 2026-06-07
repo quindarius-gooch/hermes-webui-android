@@ -177,6 +177,7 @@ This repository includes a native Android client under the `android/` directory 
 - **Audio Capture & Web Speech Integration**: WebView is configured to handle record-audio requests natively, enabling voice control/transcription inside the chat composer.
 - **File Chooser (`onShowFileChooser`)**: Deep integration with Compose's Activity Result Launchers to enable file uploads from your device's files/media selector directly to the Hermes Workspace.
 - **Background Downloads**: Integrates with Android's system `DownloadManager` to handle workspace downloads, saving files to the default public `Downloads` directory.
+- **Native Completion Notifications**: Bridges hidden WebUI completion alerts into Android system notifications for agent responses, background task results, and cron run completions when notifications are enabled.
 - **Cleartext HTTP Traffic**: Enabled by default to easily support connecting to local network servers and Tailscale endpoints without certificate validation issues.
 
 ### How to Install (Releases)

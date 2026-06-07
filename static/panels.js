@@ -7990,13 +7990,15 @@ window.addEventListener('hermes:cron_created', () => {
 function startCronPolling(){
   if(_cronPollTimer) return;
   _cronPollTimer=setInterval(async()=>{
-    if(document.hidden) return;  // don't poll when tab is in background
+    if(document.hidden && !isHermesAndroid) return;  // desktop browsers avoid background polling; Android keeps native alerts alive
     try{
       const data=await api(`/api/crons/recent?since=${_cronPollSince}`);
       if(data.completions&&data.completions.length>0){
         for(const c of data.completions){
           if(c.toast_notifications !== false){
-            showToast(t('cron_completion_status', c.name, c.status==='error' ? t('status_failed') : t('status_completed')),4000);
+            const statusText=c.status==='error' ? t('status_failed') : t('status_completed');
+            showToast(t('cron_completion_status', c.name, statusText),4000);
+            sendBrowserNotification('Cron finished', t('cron_completion_status', c.name, statusText));
           }
           _cronPollSince=Math.max(_cronPollSince,c.completed_at);
           if(c.job_id) _cronNewJobIds.add(String(c.job_id));
