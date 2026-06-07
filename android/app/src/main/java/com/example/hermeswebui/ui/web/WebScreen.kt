@@ -198,9 +198,15 @@ fun WebScreen(
                             allowContentAccess = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             
+                            // Custom User Agent suffix for client detection
+                            userAgentString = "${userAgentString} HermesAndroid"
+
                             // Enable text zoom / mobile responsive views
                             textZoom = 100
                         }
+                        
+                        // Clear HTTP cache on launch to ensure fresh resource loading
+                        clearCache(true)
 
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {

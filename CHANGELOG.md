@@ -7,6 +7,8 @@
 - **JavaScript Console Forwarding**: Overrode `onConsoleMessage` in `webChromeClient` to forward all web logs, warnings, and errors to Android Logcat (`HermesWebViewConsole` tag) for easier remote diagnostics.
 
 ### Fixed
+- **Android Caching & Service Workers**: Appended a custom `HermesAndroid` tag to the WebView's user agent and configured `static/index.html` to automatically unregister any active PWA service workers inside the Android client wrapper. This prevents service workers from serving stale, persistently cached assets and ensures server updates apply immediately.
+- **Android WebView JavaScript Error Interceptor Overlay**: Injected a global unhandled exception and promise rejection interceptor in `static/index.html` that renders a visible, full-screen debug traceback screen on Android client wrappers in case of runtime JavaScript failures.
 - **WebView Layout Collapse**: Set root `html` and `body` heights to `100%` in `static/style.css` to prevent flexbox layouts (such as `.layout` and `#mainChat`) from collapsing to 0 height in mobile WebViews.
 - **Android WebView Session Loss**: Implemented immediate cookie flushing using `CookieManager.getInstance().flush()` on page finished and app pause/ON_PAUSE lifecycle events, preventing loss of the HMAC session authentication cookie (`hermes_session`) when backgrounding or swiping away the application.
 

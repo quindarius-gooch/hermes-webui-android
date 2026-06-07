@@ -96,10 +96,79 @@
   <!-- PWA service worker registration -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js?v=__WEBUI_VERSION__').catch(function(err) {
-          console.warn('[pwa] Service worker registration failed:', err);
+      if (navigator.userAgent.indexOf('HermesAndroid') !== -1) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+            console.log('[pwa] Unregistered service worker for Android client');
+          }
         });
+      } else {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('sw.js?v=__WEBUI_VERSION__').catch(function(err) {
+            console.warn('[pwa] Service worker registration failed:', err);
+          });
+        });
+      }
+    }
+  </script>
+  <!-- Unhandled error overlay for Android diagnostics -->
+  <script>
+    if (navigator.userAgent.indexOf('HermesAndroid') !== -1) {
+      window.onerror = function(message, source, lineno, colno, error) {
+        var errDiv = document.getElementById('webview-error-overlay');
+        if (!errDiv) {
+          errDiv = document.createElement('div');
+          errDiv.id = 'webview-error-overlay';
+          errDiv.style.position = 'fixed';
+          errDiv.style.inset = '0';
+          errDiv.style.background = '#300';
+          errDiv.style.color = '#f88';
+          errDiv.style.padding = '24px';
+          errDiv.style.zIndex = '999999';
+          errDiv.style.overflow = 'auto';
+          errDiv.style.fontFamily = 'monospace';
+          errDiv.style.fontSize = '14px';
+          errDiv.style.lineHeight = '1.5';
+          document.body.appendChild(errDiv);
+        }
+        var html = '<h2 style="color:#ff8;margin-top:0;">JS Error Intercepted</h2>';
+        html += '<strong>Message:</strong> ' + message + '<br><br>';
+        html += '<strong>Source:</strong> ' + source + ':' + lineno + ':' + colno + '<br><br>';
+        if (error && error.stack) {
+          html += '<strong>Stack:</strong><br><pre style="white-space:pre-wrap;background:#100;padding:12px;border-radius:6px;border:1px solid #500;margin-top:8px;">' + error.stack + '</pre>';
+        }
+        errDiv.innerHTML = html;
+        return false;
+      };
+
+      window.addEventListener('unhandledrejection', function(event) {
+        var reason = event.reason;
+        var message = reason instanceof Error ? reason.message : String(reason);
+        var stack = reason instanceof Error ? reason.stack : '';
+        
+        var errDiv = document.getElementById('webview-error-overlay');
+        if (!errDiv) {
+          errDiv = document.createElement('div');
+          errDiv.id = 'webview-error-overlay';
+          errDiv.style.position = 'fixed';
+          errDiv.style.inset = '0';
+          errDiv.style.background = '#300';
+          errDiv.style.color = '#f88';
+          errDiv.style.padding = '24px';
+          errDiv.style.zIndex = '999999';
+          errDiv.style.overflow = 'auto';
+          errDiv.style.fontFamily = 'monospace';
+          errDiv.style.fontSize = '14px';
+          errDiv.style.lineHeight = '1.5';
+          document.body.appendChild(errDiv);
+        }
+        var html = '<h2 style="color:#ff8;margin-top:0;">Unhandled Rejection</h2>';
+        html += '<strong>Message:</strong> ' + message + '<br><br>';
+        if (stack) {
+          html += '<strong>Stack:</strong><br><pre style="white-space:pre-wrap;background:#100;padding:12px;border-radius:6px;border:1px solid #500;margin-top:8px;">' + stack + '</pre>';
+        }
+        errDiv.innerHTML = html;
       });
     }
   </script>
