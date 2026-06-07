@@ -7,6 +7,7 @@
 - **JavaScript Console Forwarding**: Overrode `onConsoleMessage` in `webChromeClient` to forward all web logs, warnings, and errors to Android Logcat (`HermesWebViewConsole` tag) for easier remote diagnostics.
 
 ### Fixed
+- **WebView Layout Collapse**: Set root `html` and `body` heights to `100%` in `static/style.css` to prevent flexbox layouts (such as `.layout` and `#mainChat`) from collapsing to 0 height in mobile WebViews.
 - **Android WebView Session Loss**: Implemented immediate cookie flushing using `CookieManager.getInstance().flush()` on page finished and app pause/ON_PAUSE lifecycle events, preventing loss of the HMAC session authentication cookie (`hermes_session`) when backgrounding or swiping away the application.
 
 ## [v1.0.0-android] — 2026-06-06 — Initial Android WebView Client Release
