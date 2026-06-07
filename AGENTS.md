@@ -25,6 +25,9 @@ For architecture, testing, or setup work, also read the matching reference:
 For UI or UX work, read `docs/UIUX-GUIDE.md` and `DESIGN.md` before
 changing layout, interaction flow, themes, chat rendering, or composer chrome.
 
+For Android app changes or additions, use Test Android Apps as part of
+verification before claiming the work is complete.
+
 ## Onboarding and reinstall support
 
 If the task involves install, reinstall, bootstrap, first-run onboarding,

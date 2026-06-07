@@ -5,6 +5,7 @@
 
 ### Added
 - **Android Native Completion Notifications**: Added an Android WebView notification bridge and Android 13+ notification permission request so hidden WebView completions can surface as system notifications for agent responses, background tasks, and cron run completions.
+- **Android Background Notification Polling & Settings**: Added native Android background polling for completed agent responses and cron runs, plus an Android app settings dialog for notification categories and polling interval.
 
 ## [v1.0.4-android] — 2026-06-07 — Viewport Resize & Connection Pool Exhaustion Fixes
 

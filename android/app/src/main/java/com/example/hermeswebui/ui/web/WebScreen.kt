@@ -9,10 +9,13 @@ import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.webkit.*
 import android.widget.Toast
@@ -28,6 +31,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,14 +43,24 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.absoluteValue
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 // Custom Palette matching Hermes gold/charcoal theme
 private val HermesBg = Color(0xFF101012)
 private val HermesGold = Color(0xFFE5C158)
 private val HermesTextPrimary = Color(0xFFEAEAEA)
+private val HermesTextSecondary = Color(0xFF8E8E93)
 private val HermesBorder = Color(0xFF2C2C30)
+private val HermesCardBg = Color(0xFF1A1A1E)
 private const val HERMES_NOTIFICATION_CHANNEL_ID = "hermes_agent_events"
 private const val HERMES_NOTIFICATION_CHANNEL_NAME = "Hermes agent events"
+private const val PREF_ANDROID_BACKGROUND_POLLING = "android_background_polling"
+private const val PREF_ANDROID_AGENT_NOTIFICATIONS = "android_agent_notifications"
+private const val PREF_ANDROID_CRON_NOTIFICATIONS = "android_cron_notifications"
+private const val PREF_ANDROID_POLL_SECONDS = "android_poll_seconds"
+private const val DEFAULT_ANDROID_POLL_SECONDS = 30
 
 private const val INJECTION_SCRIPT = """
 (function() {
@@ -113,6 +127,124 @@ private class HermesNotificationBridge(private val context: Context) {
     }
 }
 
+private data class HermesSessionSnapshot(
+    val title: String,
+    val messageCount: Int,
+    val isRunning: Boolean
+)
+
+private class HermesBackgroundNotificationPoller(
+    context: Context,
+    private val serverUrl: String,
+) {
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences("hermes_prefs", Context.MODE_PRIVATE)
+    private val handler = Handler(Looper.getMainLooper())
+    private val sessionsById = mutableMapOf<String, HermesSessionSnapshot>()
+    private var firstSessionPoll = true
+    private var cronSinceSeconds = System.currentTimeMillis() / 1000.0
+    private var running = false
+
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            Thread {
+                pollOnce()
+                handler.postDelayed(this, pollIntervalMillis())
+            }.start()
+        }
+    }
+
+    fun start() {
+        if (running || !prefs.getBoolean(PREF_ANDROID_BACKGROUND_POLLING, true)) return
+        running = true
+        handler.post(pollRunnable)
+    }
+
+    fun stop() {
+        running = false
+        handler.removeCallbacks(pollRunnable)
+    }
+
+    private fun pollIntervalMillis(): Long {
+        val seconds = prefs.getInt(PREF_ANDROID_POLL_SECONDS, DEFAULT_ANDROID_POLL_SECONDS)
+            .coerceIn(15, 300)
+        return seconds * 1000L
+    }
+
+    private fun pollOnce() {
+        if (prefs.getBoolean(PREF_ANDROID_AGENT_NOTIFICATIONS, true)) {
+            pollSessions()
+        }
+        if (prefs.getBoolean(PREF_ANDROID_CRON_NOTIFICATIONS, true)) {
+            pollCronCompletions()
+        }
+    }
+
+    private fun pollSessions() {
+        val root = getJson("$serverUrl/api/sessions?all_profiles=1") ?: return
+        val sessions = root.optJSONArray("sessions") ?: return
+        val next = mutableMapOf<String, HermesSessionSnapshot>()
+        for (i in 0 until sessions.length()) {
+            val item = sessions.optJSONObject(i) ?: continue
+            val sid = item.optString("session_id", "")
+            if (sid.isBlank()) continue
+            val snapshot = HermesSessionSnapshot(
+                title = item.optString("title", "Hermes conversation"),
+                messageCount = item.optInt("message_count", 0),
+                isRunning = item.optBoolean("is_streaming", false) ||
+                    item.optString("active_stream_id", "").isNotBlank()
+            )
+            next[sid] = snapshot
+            val previous = sessionsById[sid]
+            if (!firstSessionPoll && previous != null) {
+                val completed = previous.isRunning && !snapshot.isRunning
+                val receivedNewMessages = snapshot.messageCount > previous.messageCount
+                if (completed && receivedNewMessages) {
+                    showHermesNotification(appContext, "Response complete", snapshot.title)
+                }
+            }
+        }
+        sessionsById.clear()
+        sessionsById.putAll(next)
+        firstSessionPoll = false
+    }
+
+    private fun pollCronCompletions() {
+        val root = getJson("$serverUrl/api/crons/recent?since=$cronSinceSeconds") ?: return
+        val completions = root.optJSONArray("completions") ?: return
+        var newest = cronSinceSeconds
+        for (i in 0 until completions.length()) {
+            val item = completions.optJSONObject(i) ?: continue
+            val completedAt = item.optDouble("completed_at", 0.0)
+            if (completedAt > newest) newest = completedAt
+            if (item.optBoolean("toast_notifications", true)) {
+                val name = item.optString("name", "Cron job")
+                val status = if (item.optString("status", "") == "error") "failed" else "completed"
+                showHermesNotification(appContext, "Cron finished", "$name $status")
+            }
+        }
+        cronSinceSeconds = newest
+    }
+
+    private fun getJson(url: String): JSONObject? {
+        return try {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 5000
+                readTimeout = 5000
+                requestMethod = "GET"
+                CookieManager.getInstance().getCookie(serverUrl)?.let { cookie ->
+                    setRequestProperty("Cookie", cookie)
+                }
+            }
+            connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
+        } catch (e: Exception) {
+            Log.w("HermesPoller", "Polling failed for $url", e)
+            null
+        }
+    }
+}
+
 private fun showHermesNotification(context: Context, title: String?, body: String?) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -166,18 +298,25 @@ fun WebScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val sharedPrefs = remember { context.getSharedPreferences("hermes_prefs", Context.MODE_PRIVATE) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
+    var showAndroidSettings by remember { mutableStateOf(false) }
+    val backgroundPoller = remember(url) { HermesBackgroundNotificationPoller(context, url) }
 
     // Periodically flush cookies to disk when the app goes to the background/pause
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
                 CookieManager.getInstance().flush()
+                backgroundPoller.start()
                 Log.d("HermesWebScreen", "Flushed cookies to disk on app pause")
+            } else if (event == Lifecycle.Event.ON_RESUME) {
+                backgroundPoller.stop()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            backgroundPoller.stop()
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -266,6 +405,13 @@ fun WebScreen(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
+                        tint = HermesGold
+                    )
+                }
+                IconButton(onClick = { showAndroidSettings = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Android Settings",
                         tint = HermesGold
                     )
                 }
@@ -485,5 +631,138 @@ fun WebScreen(
                 modifier = Modifier.fillMaxSize()
             )
         }
+    }
+
+    if (showAndroidSettings) {
+        AndroidAppSettingsDialog(
+            prefs = sharedPrefs,
+            onDismiss = { showAndroidSettings = false },
+            onOpenSystemNotificationSettings = { openAndroidNotificationSettings(context) }
+        )
+    }
+}
+
+@Composable
+private fun AndroidAppSettingsDialog(
+    prefs: SharedPreferences,
+    onDismiss: () -> Unit,
+    onOpenSystemNotificationSettings: () -> Unit,
+) {
+    var backgroundPolling by remember { mutableStateOf(prefs.getBoolean(PREF_ANDROID_BACKGROUND_POLLING, true)) }
+    var agentNotifications by remember { mutableStateOf(prefs.getBoolean(PREF_ANDROID_AGENT_NOTIFICATIONS, true)) }
+    var cronNotifications by remember { mutableStateOf(prefs.getBoolean(PREF_ANDROID_CRON_NOTIFICATIONS, true)) }
+    var pollSeconds by remember {
+        mutableStateOf(prefs.getInt(PREF_ANDROID_POLL_SECONDS, DEFAULT_ANDROID_POLL_SECONDS).coerceIn(15, 300))
+    }
+
+    fun save() {
+        prefs.edit()
+            .putBoolean(PREF_ANDROID_BACKGROUND_POLLING, backgroundPolling)
+            .putBoolean(PREF_ANDROID_AGENT_NOTIFICATIONS, agentNotifications)
+            .putBoolean(PREF_ANDROID_CRON_NOTIFICATIONS, cronNotifications)
+            .putInt(PREF_ANDROID_POLL_SECONDS, pollSeconds)
+            .apply()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = HermesCardBg,
+        title = { Text("Android app settings", color = HermesTextPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                SettingsSwitchRow(
+                    title = "Background notification checks",
+                    subtitle = "Watch for completed agent responses and cron jobs while the app is backgrounded.",
+                    checked = backgroundPolling,
+                    onCheckedChange = { backgroundPolling = it; save() }
+                )
+                SettingsSwitchRow(
+                    title = "Agent response notifications",
+                    subtitle = "Notify when a conversation that was running in the background finishes.",
+                    checked = agentNotifications,
+                    enabled = backgroundPolling,
+                    onCheckedChange = { agentNotifications = it; save() }
+                )
+                SettingsSwitchRow(
+                    title = "Cron completion notifications",
+                    subtitle = "Notify when scheduled jobs report new output.",
+                    checked = cronNotifications,
+                    enabled = backgroundPolling,
+                    onCheckedChange = { cronNotifications = it; save() }
+                )
+                Text("Check interval: ${pollSeconds}s", color = HermesTextPrimary)
+                Slider(
+                    value = pollSeconds.toFloat(),
+                    onValueChange = { pollSeconds = it.toInt().coerceIn(15, 300) },
+                    onValueChangeFinished = { save() },
+                    valueRange = 15f..300f,
+                    steps = 18,
+                    enabled = backgroundPolling,
+                    colors = SliderDefaults.colors(
+                        thumbColor = HermesGold,
+                        activeTrackColor = HermesGold,
+                        inactiveTrackColor = HermesBorder,
+                    )
+                )
+                OutlinedButton(
+                    onClick = onOpenSystemNotificationSettings,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = HermesGold),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open Android notification settings")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done", color = HermesGold)
+            }
+        }
+    )
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = if (enabled) HermesTextPrimary else HermesTextSecondary)
+            Text(subtitle, color = HermesTextSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = HermesGold,
+                checkedTrackColor = HermesGold.copy(alpha = 0.35f),
+            )
+        )
+    }
+}
+
+private fun openAndroidNotificationSettings(context: Context) {
+    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
+    } else {
+        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
+    }
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Could not open Android settings", Toast.LENGTH_SHORT).show()
     }
 }

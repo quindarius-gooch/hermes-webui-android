@@ -43,3 +43,29 @@ def test_webui_completion_notifications_use_android_bridge_when_hidden():
 def test_android_cron_polling_keeps_native_completion_alerts_alive():
     assert "if(document.hidden && !isHermesAndroid) return;" in PANELS_JS
     assert "sendBrowserNotification('Cron finished'" in PANELS_JS
+
+
+def test_android_native_background_poller_observes_sessions_and_crons():
+    assert "private class HermesBackgroundNotificationPoller" in WEB_SCREEN
+    assert 'getJson("$serverUrl/api/sessions?all_profiles=1")' in WEB_SCREEN
+    assert 'getJson("$serverUrl/api/crons/recent?since=$cronSinceSeconds")' in WEB_SCREEN
+    assert 'CookieManager.getInstance().getCookie(serverUrl)' in WEB_SCREEN
+    assert 'showHermesNotification(appContext, "Response complete", snapshot.title)' in WEB_SCREEN
+    assert 'showHermesNotification(appContext, "Cron finished", "$name $status")' in WEB_SCREEN
+
+
+def test_android_poller_runs_only_while_app_is_backgrounded():
+    assert "backgroundPoller.start()" in WEB_SCREEN
+    assert "backgroundPoller.stop()" in WEB_SCREEN
+    assert "event == Lifecycle.Event.ON_PAUSE" in WEB_SCREEN
+    assert "event == Lifecycle.Event.ON_RESUME" in WEB_SCREEN
+
+
+def test_android_app_settings_dialog_controls_native_notifications():
+    assert "AndroidAppSettingsDialog" in WEB_SCREEN
+    assert "imageVector = Icons.Default.Settings" in WEB_SCREEN
+    assert 'PREF_ANDROID_BACKGROUND_POLLING = "android_background_polling"' in WEB_SCREEN
+    assert 'PREF_ANDROID_AGENT_NOTIFICATIONS = "android_agent_notifications"' in WEB_SCREEN
+    assert 'PREF_ANDROID_CRON_NOTIFICATIONS = "android_cron_notifications"' in WEB_SCREEN
+    assert 'PREF_ANDROID_POLL_SECONDS = "android_poll_seconds"' in WEB_SCREEN
+    assert "Open Android notification settings" in WEB_SCREEN
