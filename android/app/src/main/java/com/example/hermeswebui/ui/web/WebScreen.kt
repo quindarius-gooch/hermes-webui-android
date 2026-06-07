@@ -40,6 +40,64 @@ private val HermesGold = Color(0xFFE5C158)
 private val HermesTextPrimary = Color(0xFFEAEAEA)
 private val HermesBorder = Color(0xFF2C2C30)
 
+private const val INJECTION_SCRIPT = """
+(function() {
+    // 1. EventSource Override
+    if (window.EventSource && !window.__eventSourceOverridden) {
+        var OriginalES = window.EventSource;
+        var WrappedEventSource = function(url, options) {
+            var urlStr = String(url);
+            if (urlStr.includes('api/sessions/gateway/stream') ||
+                urlStr.includes('api/approval/stream') ||
+                urlStr.includes('api/clarify/stream') ||
+                urlStr.includes('api/sessions/events')) {
+                console.log('Blocked EventSource for: ' + urlStr + ' (Android optimization)');
+                throw new Error('SSE disabled on Android wrapper to conserve connection pool');
+            }
+            if (this instanceof WrappedEventSource) {
+                return new OriginalES(url, options);
+            } else {
+                return OriginalES(url, options);
+            }
+        };
+        WrappedEventSource.prototype = OriginalES.prototype;
+        WrappedEventSource.CONNECTING = OriginalES.CONNECTING;
+        WrappedEventSource.OPEN = OriginalES.OPEN;
+        WrappedEventSource.CLOSED = OriginalES.CLOSED;
+        window.EventSource = WrappedEventSource;
+        window.__eventSourceOverridden = true;
+        console.log('EventSource override injected');
+    }
+
+    // 2. Viewport Height Fix
+    var injectStylesAndSetupResize = function() {
+        if (document.getElementById('hermes-android-viewport-fix')) return;
+        var style = document.createElement('style');
+        style.id = 'hermes-android-viewport-fix';
+        style.textContent = 'html, body { height: 100vh !important; height: 100dvh !important; min-height: 100% !important; }';
+        if (document.documentElement) {
+            document.documentElement.appendChild(style);
+        }
+        var setH = function() {
+            var h = window.innerHeight + 'px';
+            if (document.documentElement) document.documentElement.style.setProperty('height', h, 'important');
+            if (document.body) document.body.style.setProperty('height', h, 'important');
+        };
+        setH();
+        window.addEventListener('resize', setH);
+        window.addEventListener('load', setH);
+        document.addEventListener('DOMContentLoaded', setH);
+        console.log('Viewport height fix style injected');
+    };
+
+    if (document.documentElement) {
+        injectStylesAndSetupResize();
+    } else {
+        document.addEventListener('DOMContentLoaded', injectStylesAndSetupResize);
+    }
+})();
+"""
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebScreen(
@@ -220,6 +278,7 @@ fun WebScreen(
                             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                 isPageLoading = true
                                 loadingProgress = 0
+                                view?.evaluateJavascript(INJECTION_SCRIPT, null)
                             }
 
                              override fun onPageFinished(view: WebView?, url: String?) {
@@ -227,6 +286,7 @@ fun WebScreen(
                                  loadingProgress = 100
                                  CookieManager.getInstance().flush()
                                  Log.d("HermesWebScreen", "Flushed cookies to disk on page finished: $url")
+                                 view?.evaluateJavascript(INJECTION_SCRIPT, null)
                              }
 
                             override fun onReceivedError(
@@ -248,6 +308,7 @@ fun WebScreen(
                                  if (newProgress >= 100) {
                                      isPageLoading = false
                                  }
+                                 view?.evaluateJavascript(INJECTION_SCRIPT, null)
                              }
 
                              // Forward JavaScript console messages/errors to Android Logcat
