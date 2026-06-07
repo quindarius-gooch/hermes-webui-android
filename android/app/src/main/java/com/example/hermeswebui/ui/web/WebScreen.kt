@@ -116,6 +116,7 @@ fun WebScreen(
         modifier = modifier
             .fillMaxSize()
             .background(HermesBg)
+            .statusBarsPadding()
     ) {
         // Premium App Bar
         TopAppBar(
@@ -175,12 +176,19 @@ fun WebScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .imePadding()
+                .navigationBarsPadding()
         ) {
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
                         webViewInstance = this
                         
+                        // Enable remote debugging
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                            WebView.setWebContentsDebuggingEnabled(true)
+                        }
+
                         // Enable Cookies
                         CookieManager.getInstance().setAcceptCookie(true)
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

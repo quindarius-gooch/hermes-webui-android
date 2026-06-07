@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Hermes">
 <link rel="apple-touch-icon" sizes="512x512" href="static/apple-touch-icon.png">
-<script>(function(){try{var themes={light:1,dark:1,system:1},skins={default:1,ares:1,mono:1,graphite:1,slate:1,poseidon:1,sisyphus:1,charizard:1,sienna:1,catppuccin:1,hepburn:1,nous:1,'geist-contrast':1,neon:1,zeus:1,'verdigris':1},legacy={slate:['dark','slate'],solarized:['dark','poseidon'],monokai:['dark','sisyphus'],nord:['dark','slate'],oled:['dark','default']},t=(localStorage.getItem('hermes-theme')||'dark').toLowerCase(),s=(localStorage.getItem('hermes-skin')||'').toLowerCase(),m=legacy[t],theme=m?m[0]:(themes[t]?t:'dark'),skin=skins[s]?s:(m?m[1]:'default');localStorage.setItem('hermes-theme',theme);localStorage.setItem('hermes-skin',skin);if(theme==='system')theme=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';if(theme==='dark')document.documentElement.classList.add('dark');if(skin!=='default')document.documentElement.dataset.skin=skin;}catch(e){document.documentElement.classList.add('dark');}})()</script>
+<script>(function(){try{var themes={light:1,dark:1,system:1},skins={default:1,ares:1,mono:1,graphite:1,slate:1,poseidon:1,sisyphus:1,charizard:1,sienna:1,catppuccin:1,hepburn:1,nous:1,'geist-contrast':1,neon:1,zeus:1,'verdigris':1},legacy={slate:['dark','slate'],solarized:['dark','poseidon'],monokai:['dark','sisyphus'],nord:['dark','slate'],oled:['dark','default']},t=(localStorage.getItem('hermes-theme')||'dark').toLowerCase(),s=(localStorage.getItem('hermes-skin')||'').toLowerCase(),m=legacy[t],theme=m?m[0]:(themes[t]?t:'dark'),skin=skins[s]?s:(m?m[1]:'default');localStorage.setItem('hermes-theme',theme);localStorage.setItem('hermes-skin',skin);if(theme==='system')theme=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';if(theme==='dark')document.documentElement.classList.add('dark');if(skin!=='default')document.documentElement.dataset.skin=skin;if(navigator.userAgent.indexOf('HermesAndroid')!==-1){document.documentElement.classList.add('hermes-android');var setH=function(){var h=window.innerHeight+'px';document.documentElement.style.setProperty('height',h,'important');if(document.body)document.body.style.setProperty('height',h,'important');};setH();window.addEventListener('resize',setH);window.addEventListener('load',setH);document.addEventListener('DOMContentLoaded',setH);}}catch(e){document.documentElement.classList.add('dark');}})()</script>
 <script>(function(){try{var fs=localStorage.getItem('hermes-font-size');if(fs&&fs!=='default')document.documentElement.dataset.fontSize=fs;}catch(e){}})()</script>
 <!-- theme-color: surfaces the active app chrome color to native status bars (Safari status bar, PWA, native WKWebView wrappers). Updated dynamically by boot.js when theme/skin changes. The light/dark default values match style.css :root --sidebar / :root.dark --sidebar. -->
 <meta name="theme-color" content="#FAF7F0" media="(prefers-color-scheme: light)">
@@ -168,7 +168,25 @@
         if (stack) {
           html += '<strong>Stack:</strong><br><pre style="white-space:pre-wrap;background:#100;padding:12px;border-radius:6px;border:1px solid #500;margin-top:8px;">' + stack + '</pre>';
         }
-        errDiv.innerHTML = html;
+      });
+    }
+  </script>
+  <script>
+    if (navigator.userAgent.indexOf('HermesAndroid') !== -1) {
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          console.log('[Android Debug] window.innerHeight=' + window.innerHeight + 
+                      ' clientHeight=' + document.documentElement.clientHeight + 
+                      ' body.clientHeight=' + document.body.clientHeight + 
+                      ' screen.height=' + window.screen.height + 
+                      ' devicePixelRatio=' + window.devicePixelRatio);
+          console.log('[Android Debug] html.className=' + document.documentElement.className +
+                      ' html.height=' + window.getComputedStyle(document.documentElement).height +
+                      ' body.height=' + window.getComputedStyle(document.body).height +
+                      ' body.display=' + window.getComputedStyle(document.body).display +
+                      ' body.position=' + window.getComputedStyle(document.body).position);
+          console.log('[Android Debug] userAgent=' + navigator.userAgent);
+        }, 1000);
       });
     }
   </script>

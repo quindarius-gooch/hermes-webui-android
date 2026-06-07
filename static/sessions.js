@@ -14,6 +14,8 @@ const ICONS={
   link:'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.7 9.3a3 3 0 0 1 0-4.2l1.7-1.7a3 3 0 0 1 4.2 4.2l-1 1"/><path d="M9.3 6.7a3 3 0 0 1 0 4.2l-1.7 1.7a3 3 0 0 1-4.2-4.2l1-1"/></svg>',
 };
 
+var isHermesAndroid = typeof navigator !== 'undefined' && navigator.userAgent.indexOf('HermesAndroid') !== -1;
+
 // Tracks which session_id is currently being loaded. Used to discard stale
 // responses from in-flight requests when the user switches sessions again
 // before the first request completes (#1060).
@@ -3128,7 +3130,7 @@ function ensureSessionEventsSSE(){
     });
     document._hermesSessionEventsVisibilityHook = true;
   }
-  if(typeof EventSource==='undefined') return;
+  if(typeof EventSource==='undefined' || isHermesAndroid) return;
   if(typeof document !== 'undefined' && document.hidden) return;
   if(_sessionEventsSSE) return;
   try{
@@ -3241,6 +3243,10 @@ async function probeGatewaySSEStatus(){
 function startGatewaySSE(){
   stopGatewaySSE();
   if(!window._showCliSessions) return;
+  if(isHermesAndroid){
+    startGatewayPollFallback(_gatewayFallbackPollMs);
+    return;
+  }
   try{
     _gatewaySSE = new EventSource('api/sessions/gateway/stream');
     _gatewaySSE.addEventListener('sessions_changed', (ev) => {

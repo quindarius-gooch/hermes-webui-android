@@ -16,6 +16,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -47,6 +49,8 @@ fun SetupScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     var urlInput by remember { mutableStateOf("http://") }
     var isLoading by remember { mutableStateOf(false) }
@@ -67,7 +71,8 @@ fun SetupScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(HermesBg),
+            .background(HermesBg)
+            .systemBarsPadding(),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -160,6 +165,8 @@ fun SetupScreen(
                                 errorMessage = "Please enter a valid URL"
                                 return@Button
                             }
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
                             isLoading = true
                             errorMessage = null
 

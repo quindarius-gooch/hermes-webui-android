@@ -1,3 +1,5 @@
+var isHermesAndroid = typeof navigator !== 'undefined' && navigator.userAgent.indexOf('HermesAndroid') !== -1;
+
 function _markSessionViewed(sid, messageCount) {
   if(typeof _setSessionViewedCount!=='function' || !sid) return;
   const next = Number.isFinite(messageCount) ? Number(messageCount) : 0;
@@ -3129,6 +3131,10 @@ async function respondApproval(choice) {
 function startApprovalPolling(sid) {
   stopApprovalPolling();
   _approvalPollingSessionId = sid || null;
+  if (isHermesAndroid) {
+    _startApprovalFallbackPoll(sid);
+    return;
+  }
   // ── SSE (preferred): long-lived connection, server pushes instantly ──
   try {
     const es = new EventSource(new URL('api/approval/stream?session_id=' + encodeURIComponent(sid), document.baseURI || location.href).href);
@@ -3683,7 +3689,10 @@ function startClarifyPolling(sid) {
   stopClarifyPolling();
   _clarifyPollingSessionId = sid || null;
   _clarifyMissingEndpointWarned = false;
-
+  if (isHermesAndroid) {
+    _startClarifyFallbackPoll(sid);
+    return;
+  }
   // SSE primary path: long-lived connection pushes events instantly.
   try {
     _clarifyEventSource = new EventSource(new URL('api/clarify/stream?session_id=' + encodeURIComponent(sid), document.baseURI || location.href).href);
