@@ -54,11 +54,14 @@ def test_android_native_background_poller_observes_sessions_and_crons():
     assert 'showHermesNotification(appContext, "Cron finished", "$name $status")' in WEB_SCREEN
 
 
-def test_android_poller_runs_only_while_app_is_backgrounded():
-    assert "backgroundPoller.start()" in WEB_SCREEN
+def test_android_poller_keeps_foreground_baseline_and_notifies_in_background():
+    assert "backgroundPoller.start(notifyOnCompletion = false)" in WEB_SCREEN
+    assert "backgroundPoller.start(notifyOnCompletion = true)" in WEB_SCREEN
     assert "backgroundPoller.stop()" in WEB_SCREEN
     assert "event == Lifecycle.Event.ON_PAUSE" in WEB_SCREEN
     assert "event == Lifecycle.Event.ON_RESUME" in WEB_SCREEN
+    assert "if (notifyOnCompletion && completed && receivedNewMessages)" in WEB_SCREEN
+    assert 'if (notifyOnCompletion && item.optBoolean("toast_notifications", true))' in WEB_SCREEN
 
 
 def test_android_app_settings_dialog_controls_native_notifications():

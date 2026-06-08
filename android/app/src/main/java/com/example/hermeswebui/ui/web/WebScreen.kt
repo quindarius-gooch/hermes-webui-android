@@ -144,6 +144,7 @@ private class HermesBackgroundNotificationPoller(
     private var firstSessionPoll = true
     private var cronSinceSeconds = System.currentTimeMillis() / 1000.0
     private var running = false
+    @Volatile private var notifyOnCompletion = false
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -155,7 +156,8 @@ private class HermesBackgroundNotificationPoller(
         }
     }
 
-    fun start() {
+    fun start(notifyOnCompletion: Boolean) {
+        this.notifyOnCompletion = notifyOnCompletion
         if (running || !prefs.getBoolean(PREF_ANDROID_BACKGROUND_POLLING, true)) return
         running = true
         handler.post(pollRunnable)
@@ -200,7 +202,7 @@ private class HermesBackgroundNotificationPoller(
             if (!firstSessionPoll && previous != null) {
                 val completed = previous.isRunning && !snapshot.isRunning
                 val receivedNewMessages = snapshot.messageCount > previous.messageCount
-                if (completed && receivedNewMessages) {
+                if (notifyOnCompletion && completed && receivedNewMessages) {
                     showHermesNotification(appContext, "Response complete", snapshot.title)
                 }
             }
@@ -218,7 +220,7 @@ private class HermesBackgroundNotificationPoller(
             val item = completions.optJSONObject(i) ?: continue
             val completedAt = item.optDouble("completed_at", 0.0)
             if (completedAt > newest) newest = completedAt
-            if (item.optBoolean("toast_notifications", true)) {
+            if (notifyOnCompletion && item.optBoolean("toast_notifications", true)) {
                 val name = item.optString("name", "Cron job")
                 val status = if (item.optString("status", "") == "error") "failed" else "completed"
                 showHermesNotification(appContext, "Cron finished", "$name $status")
@@ -303,18 +305,20 @@ fun WebScreen(
     var showAndroidSettings by remember { mutableStateOf(false) }
     val backgroundPoller = remember(url) { HermesBackgroundNotificationPoller(context, url) }
 
-    // Periodically flush cookies to disk when the app goes to the background/pause
+    // Keep a quiet foreground baseline so background notifications can detect
+    // conversations that were already running before the app paused.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
                 CookieManager.getInstance().flush()
-                backgroundPoller.start()
+                backgroundPoller.start(notifyOnCompletion = true)
                 Log.d("HermesWebScreen", "Flushed cookies to disk on app pause")
             } else if (event == Lifecycle.Event.ON_RESUME) {
-                backgroundPoller.stop()
+                backgroundPoller.start(notifyOnCompletion = false)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
+        backgroundPoller.start(notifyOnCompletion = false)
         onDispose {
             backgroundPoller.stop()
             lifecycleOwner.lifecycle.removeObserver(observer)
