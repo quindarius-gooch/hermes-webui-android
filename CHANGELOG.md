@@ -3,9 +3,25 @@
 
 ## [Unreleased]
 
+## [v1.0.8-android] — 2026-06-08 — Background Notification Baseline Fix
+
+### Fixed
+- **Android Background Notification Baseline**: Injected a quiet foreground baseline so background notifications can reliably detect and notify on completions for conversations already running before the app paused.
+
+## [v1.0.7-android] — 2026-06-07 — Settings & Background Polling
+
+### Added
+- **Android Background Notification Polling & Settings**: Added native Android background polling for completed agent responses and cron runs, plus an Android app settings dialog for notification categories and polling interval.
+
+## [v1.0.6-android] — 2026-06-07 — Native Completion Notifications
+
 ### Added
 - **Android Native Completion Notifications**: Added an Android WebView notification bridge and Android 13+ notification permission request so hidden WebView completions can surface as system notifications for agent responses, background tasks, and cron run completions.
-- **Android Background Notification Polling & Settings**: Added native Android background polling for completed agent responses and cron runs, plus an Android app settings dialog for notification categories and polling interval.
+
+## [v1.0.5-android] — 2026-06-07 — EventSource & Viewport Overrides
+
+### Changed
+- **Client-Side EventSource & Viewport Overrides**: Implemented client-side EventSource and viewport overrides in the WebView wrapper to support SSE streaming and responsive viewport scaling on various device widths.
 
 ## [v1.0.4-android] — 2026-06-07 — Viewport Resize & Connection Pool Exhaustion Fixes
 

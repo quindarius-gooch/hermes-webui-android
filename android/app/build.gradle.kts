@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.hermeswebui"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = System.getenv("ANDROID_VERSION_CODE")?.toIntOrNull() ?: 8
+        versionName = System.getenv("ANDROID_VERSION_NAME") ?: "1.0.8"
     }
 
     buildTypes {
